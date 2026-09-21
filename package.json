@@ -1,0 +1,20 @@
+{
+  "name": "excel-comparison-tool",
+  "version": "1.0.0",
+  "description": "Compare two large Excel workbooks (streaming pipeline, designed to handle multi-gigabyte files) and produce a full diff report.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "multer": "^1.4.5-lts.1",
+    "exceljs": "^4.4.0",
+    "better-sqlite3": "^11.3.0",
+    "yauzl": "^2.10.0",
+    "uuid": "^9.0.1"
+  }
+}

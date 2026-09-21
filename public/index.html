@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Excel Comparison Tool</title>
+<link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+  <div class="layout">
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark">⟡</span>
+        <span class="brand-name">Excel Comparison Tool</span>
+      </div>
+      <div class="topbar-meta mono" id="serverMeta">connecting…</div>
+    </header>
+
+    <div class="body">
+      <aside class="sidebar">
+        <nav>
+          <button class="nav-link active" data-view="compare">New comparison</button>
+          <button class="nav-link" data-view="how">How it works</button>
+          <button class="nav-link" data-view="limits">Limits &amp; tips</button>
+        </nav>
+      </aside>
+
+      <main class="content">
+        <section id="view-compare" class="view active">
+          <div class="page-head">
+            <h1>Compare two reports</h1>
+            <p class="lede">
+              Upload two spreadsheets to compare their structure and contents — matching columns, matched and
+              unmatched rows, duplicates, and optional cell-by-cell differences — then download it all as one report.
+              Large files are streamed to disk and compared using an embedded database, not held in memory, so
+              multi-gigabyte workbooks are supported.
+            </p>
+            <button class="reset-btn" id="resetBtn">Start over</button>
+          </div>
+          <div id="app"></div>
+        </section>
+
+        <section id="view-how" class="view">
+          <div class="page-head"><h1>How it works</h1></div>
+          <div class="card prose">
+            <ol>
+              <li><strong>Upload.</strong> Both files stream straight to disk on the server as they upload — nothing is held fully in browser or server memory.</li>
+              <li><strong>Configure.</strong> Pick which sheet and which row holds column headers for each file.</li>
+              <li><strong>Choose key columns.</strong> These identify a row (e.g. an ID) and are used to match rows between the two files and to detect duplicates within each file.</li>
+              <li><strong>Optional cell comparison.</strong> Pick specific columns to compare value-by-value for rows that match on the key.</li>
+              <li><strong>Compare.</strong> Each file is streamed row-by-row into a local SQLite database. All the heavy joins (matched / only-in-A / only-in-B / duplicates) run inside SQLite using indexes, not in JavaScript, so memory use stays flat regardless of file size.</li>
+              <li><strong>Report.</strong> The output workbook is streamed directly to disk sheet by sheet, so even very large detail sheets never need to fit in memory at once.</li>
+            </ol>
+          </div>
+        </section>
+
+        <section id="view-limits" class="view">
+          <div class="page-head"><h1>Limits &amp; tips</h1></div>
+          <div class="card prose">
+            <ul>
+              <li>Supported formats: <span class="mono">.xlsx</span> and <span class="mono">.xls</span>. (.xls files still go through the same streaming reader.)</li>
+              <li>Max upload size defaults to <span class="mono">5&nbsp;GB</span> per file — configurable via the <span class="mono">MAX_FILE_MB</span> environment variable on the server.</li>
+              <li>If a workbook has several large sheets, picking the sheet you need as the <em>first</em> sheet is faster — the reader streams sequentially through sheets in file order.</li>
+              <li>Disk space: the server needs roughly the size of both input files again for the working database, plus space for the output report. Make sure the host has enough free disk.</li>
+              <li>If you deploy this behind a reverse proxy (nginx, etc.), raise <span class="mono">client_max_body_size</span> to match your upload limit.</li>
+              <li>A comparison session (uploaded files + working database) is automatically cleaned up an hour after it's created.</li>
+            </ul>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <footer class="footer">
+      Excel Comparison Tool — runs entirely on your own server. No data is sent anywhere else.
+    </footer>
+  </div>
+
+  <script src="/js/app.js"></script>
+</body>
+</html>
