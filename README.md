@@ -1,54 +1,122 @@
 # Excel Comparison Tool
 
-Compares two Excel workbooks — column-by-column and row-by-row — and produces a
-full diff report as a downloadable `.xlsx` file. Built to handle very large
-files (multi-gigabyte) by never loading a whole workbook into memory:
+A web-based application for comparing two Excel workbooks and generating a detailed Excel comparison report.
 
-- **Upload** streams straight to disk (`multer` disk storage) — the server
-  never buffers a whole file in RAM.
-- **Reading** each sheet uses ExcelJS's streaming (SAX-style) reader, which
-  processes one row at a time with a small constant memory footprint.
-- **Comparison** (matching, duplicates, only-in-A/B) runs as indexed SQL
-  queries inside an embedded SQLite database (`better-sqlite3`), not as
-  JavaScript array operations — so it stays fast and memory-light regardless
-  of row count.
-- **The report** is streamed straight to disk sheet-by-sheet with ExcelJS's
-  streaming writer, so even huge detail sheets never sit fully in memory.
+This project is designed to handle large Excel files efficiently by processing the files row-by-row instead of loading the complete workbooks into memory.
 
-This is a real, from-scratch project — I was not able to run `npm install` or
-execute it in this environment (no network access here), so please treat it
-as a solid first version to test on your machine rather than something
-already verified end-to-end. The architecture and APIs used are accurate to
-the documented behavior of ExcelJS / better-sqlite3 / multer, but I'd
-recommend testing with a small file first, then a large one.
+> **Project status:** This is a first version of the system. It has not been fully tested in the current environment because package installation could not be performed without network access. It is recommended to test with a small Excel file first before using large files.
 
-## 1. Install & run
+## Features
 
-Requires Node.js 18+.
+* Upload two Excel workbooks for comparison
+* Compare data row-by-row and column-by-column
+* Find matching records
+* Find records available only in File A
+* Find records available only in File B
+* Detect duplicate records
+* Generate a downloadable Excel comparison report
+* Process large files using streaming
+* Use SQLite for efficient data comparison
+* Automatically clean up temporary comparison files
+
+## How It Works
+
+The system follows these main steps:
+
+1. The user uploads two Excel files.
+2. The files are stored directly on the server's disk.
+3. ExcelJS reads the workbooks row-by-row.
+4. The extracted data is stored temporarily in SQLite.
+5. SQL queries are used to compare the data.
+6. The comparison results are written to a new Excel file.
+7. The generated report can be downloaded by the user.
+
+The system avoids loading the complete Excel workbooks or report into memory, which helps reduce memory usage when working with large files.
+
+## Technologies Used
+
+* **Node.js** – Backend runtime
+* **Express.js** – Web server and API
+* **ExcelJS** – Reading and writing Excel files
+* **SQLite** – Temporary data storage and comparison
+* **better-sqlite3** – SQLite integration
+* **Multer** – File uploads
+* **HTML / CSS / JavaScript** – Frontend
+
+## Project Structure
+
+```text
+excel-compare-app/
+│
+├── server.js
+│
+├── routes/
+│   └── api.js
+│
+├── lib/
+│   ├── sheetNames.js
+│   ├── ingest.js
+│   ├── compare.js
+│   ├── report.js
+│   └── sessions.js
+│
+├── public/
+│   ├── index.html
+│   ├── css/
+│   │   └── style.css
+│   └── js/
+│       └── app.js
+│
+├── data/
+│   └── sessions/
+│
+├── package.json
+└── README.md
+```
+
+## Installation
+
+### Requirements
+
+* Node.js 18 or newer
+* npm
+* Python and a C++ build toolchain may be required for `better-sqlite3`
+
+### Setup
+
+Clone the repository and open the project folder:
 
 ```bash
+git clone <repository-url>
 cd excel-compare-app
+```
+
+Install the dependencies:
+
+```bash
 npm install
+```
+
+Start the application:
+
+```bash
 npm start
 ```
 
-Then open **http://localhost:3000**.
+Then open:
 
-`better-sqlite3` compiles a small native module during `npm install` — this
-needs Python and a C++ toolchain available on the machine (normal on most
-dev machines; on a bare Linux server you may need `build-essential` /
-`python3` installed first). If that's a hassle, an alternative is swapping
-`better-sqlite3` for `sql.js` (WASM, no native build) — happy to adapt if you
-hit issues.
+```text
+http://localhost:3000
+```
 
-## 2. Configuration
+## Configuration
 
-Environment variables (optional):
+The application supports the following environment variables:
 
-| Variable       | Default | Purpose                                      |
-|----------------|---------|-----------------------------------------------|
-| `PORT`         | `3000`  | HTTP port                                     |
-| `MAX_FILE_MB`  | `5000`  | Max size per uploaded file, in MB             |
+| Variable      | Default | Description                      |
+| ------------- | ------: | -------------------------------- |
+| `PORT`        |  `3000` | Port used by the application     |
+| `MAX_FILE_MB` |  `5000` | Maximum size of an uploaded file |
 
 Example:
 
@@ -56,64 +124,77 @@ Example:
 PORT=8080 MAX_FILE_MB=10000 npm start
 ```
 
-## 3. Deploying
+## Large File Handling
 
-Since this needs a persistent Node process (not just static files), it needs
-actual server hosting rather than static hosting like GitHub Pages / Netlify.
-Reasonable options:
+The application is designed with large Excel files in mind.
 
-- **Your own VPS / server**: `npm install && npm start` (use `pm2` or a
-  systemd service to keep it running).
-- **Render / Railway / Fly.io**: point them at this repo; they'll run
-  `npm install` and `npm start` automatically. Make sure the plan has enough
-  disk space for your expected file sizes (see below).
-- **Reverse proxy (nginx, etc.)**: raise `client_max_body_size` to match
-  `MAX_FILE_MB`, or large uploads will be rejected by the proxy before they
-  reach the app.
+Instead of loading everything into memory:
 
-## 4. Disk space planning
+* File uploads are written directly to disk using Multer.
+* ExcelJS processes spreadsheet data row-by-row.
+* SQLite is used for storing and comparing the data.
+* SQL queries are used instead of large JavaScript arrays.
+* ExcelJS streaming writer is used to generate the final report.
 
-For a comparison, the server temporarily needs roughly:
+Temporary storage is required for:
 
-- Both original uploaded files (kept for the duration of the session)
-- A SQLite working database (roughly comparable in size to the two input
-  files combined, sometimes a bit more due to indexes)
-- The output report file
+* The two uploaded Excel files
+* The SQLite working database
+* The generated report
 
-As a rule of thumb, plan for **~3-4x the combined size of your two input
-files** in free disk space. Sessions (uploads + working database) are
-automatically deleted an hour after creation; you can lower `SESSION_TTL_MS`
-in `lib/sessions.js` if you want them cleaned up sooner.
+For large comparisons, it is recommended to have around **3–4× the combined size of the input files** available as free disk space.
 
-## 5. Project structure
+## Output
 
-```
-excel-compare-app/
-  server.js              Express entry point
-  routes/api.js           All API endpoints + the async compare job
-  lib/
-    sheetNames.js         Fast sheet-name listing (reads zip metadata only)
-    ingest.js              Streaming xlsx reader -> SQLite ingestion
-    compare.js             SQL-based diff engine (matched/only-in/duplicates)
-    report.js              Streaming xlsx report writer
-    sessions.js            In-memory session + auto-cleanup
-  public/
-    index.html             Site shell: header, sidebar, footer
-    css/style.css
-    js/app.js               Frontend wizard logic (talks to the API only)
-  data/sessions/<id>/       Per-comparison working files (created at runtime)
-```
+The system generates an Excel report containing the comparison results, including information such as:
 
-## 6. Known limitations / good next steps
+* Matching records
+* Records only in File A
+* Records only in File B
+* Duplicate records
+* Data differences
 
-- Job state is kept in memory in a single Node process — fine for one server
-  instance, but won't work if you run multiple instances behind a load
-  balancer without adding a shared store (e.g. Redis) for job status.
-- SQLite writes/joins happen synchronously on the main thread. For very large
-  files this can make the server briefly less responsive to other requests
-  during a comparison. Moving the compare job into a Node `worker_thread`
-  would fix this without changing the overall design.
-- `.xls` (older binary format) is passed through the same code path; ExcelJS
-  supports it, but it's less battle-tested at very large sizes than `.xlsx`.
-- No authentication — add a login/API-key layer before exposing this
-  publicly if the spreadsheets are sensitive.
+## Limitations
+
+The current version has some limitations:
+
+* Job status is stored in the memory of the Node.js process.
+* SQLite operations are currently synchronous.
+* Authentication has not been implemented.
+* Large `.xls` files require additional testing.
+* The application is currently designed mainly for a single server instance.
+
+## Future Improvements
+
+Possible future improvements include:
+
+* User authentication
+* User roles and permissions
+* Progress indicators for large comparisons
+* Background processing using Node.js worker threads
+* Redis for shared job management
+* Comparison history
+* More Excel file format support
+* Selective sheet/column comparison
+* Improved error handling
+* More detailed reports and visual summaries
+
+## Deployment
+
+This application requires a server that can run a Node.js process.
+
+It can be deployed on:
+
+* A VPS
+* A university/company server
+* Render
+* Railway
+* Fly.io
+
+If using a reverse proxy such as nginx, the upload size limit should be configured to allow files up to the application's `MAX_FILE_MB` setting.
+
+## Note
+
+This project was developed from scratch as an Excel comparison system. The implementation and architecture are designed around efficient processing of large Excel files.
+
+The application has **not been fully tested end-to-end in the current development environment** because package installation was not available. Therefore, testing should first be performed with a small Excel workbook before moving to larger files.
